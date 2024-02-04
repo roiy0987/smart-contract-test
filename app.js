@@ -1,17 +1,14 @@
+require("dotenv").config();
 const { Web3 } = require("web3");
-//const axios = require("axios");
 
-const infuraApiKey = "9cd8200232434f90a3db7965054a6fc1"; // Infura API key
-const infuraUrl = `https://mainnet.infura.io/v3/${infuraApiKey}`;
+const infuraApiKey = process.env.INFURA_API_KEY; // Infura API key
+const infuraUrl = `wss://mainnet.infura.io/ws/v3/${infuraApiKey}`;
 
+//const web3 = new Web3(new Web3.providers.WebsocketProvider(infuraUrl));
 const web3 = new Web3(infuraUrl);
 
-const tokenAddress = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"; // Replace with your token contract address
-
-//const apiKey = "R9UBKCNY2N7KYJ43GWTG9KHCG1E49TR6VP"; // Etherscan API key
-//const apiUrl = `https://api.etherscan.io/api?module=contract&action=getabi&address=${tokenAddress}&apikey=${apiKey}`;
-
-//let tokenABI;
+const tokenAddress = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"; //"0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"; // Replace with your token contract address
+// const token_ABI = process.env.TOKEN_ABI;
 
 let minimalTokenABI = [
   {
@@ -42,32 +39,37 @@ let minimalTokenABI = [
     stateMutability: "view",
     type: "function",
   },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        name: "from",
+        type: "address",
+      },
+      {
+        indexed: true,
+        name: "to",
+        type: "address",
+      },
+      {
+        indexed: false,
+        name: "value",
+        type: "uint256",
+      },
+    ],
+    name: "Transfer",
+    type: "event",
+  },
 ];
 let tokenContract = new web3.eth.Contract(minimalTokenABI, tokenAddress);
-// axios
-//   .get(apiUrl)
-//   .then((response) => {
-//     const { status, result } = response.data;
-//     //console.log(response);
-//     //console.log(result);
-//     if (status === "1") {
-//       tokenABI = JSON.parse(result);
-//       //console.log(tokenABI);
-//       getTokenInfo();
-//     } else {
-//       console.error("Error:", result);
-//     }
-//   })
-//   .catch((error) => {
-//     console.error("API Request Error:", error.message);
-//   });
 
 async function getTokenInfo() {
   try {
-    //console.log(await tokenContract.methods.implementation().call());
-    console.log(tokenContract);
-    const name = await tokenContract.methods.name().call();
-    const symbol = await tokenContract.methods.symbol().call();
+    const [name, symbol] = await Promise.all([
+      tokenContract.methods.name().call(),
+      tokenContract.methods.symbol().call(),
+    ]);
 
     console.log("Token Name:", name);
     console.log("Token Symbol:", symbol);
@@ -75,4 +77,28 @@ async function getTokenInfo() {
     console.error("Error querying token information:", error);
   }
 }
+
+async function listenForTransferEvents() {
+  try {
+    // Subscribe to Transfer events
+    tokenContract.events
+      .Transfer({
+        fromBlock: "latest",
+      })
+      .on("data", (event) => {
+        console.log("Transfer Event:");
+        console.log("--------------");
+        console.log(`from:${event.returnValues.from}`);
+        console.log(`to:${event.returnValues.to}`);
+        console.log(`value:${event.returnValues.value}`);
+        console.log("--------------");
+      });
+  } catch (error) {
+    console.error("Error:", error);
+  }
+}
+
 getTokenInfo();
+
+// Start listening for events
+listenForTransferEvents();
